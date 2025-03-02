@@ -48,6 +48,7 @@ calculateHash(file,{
 
 ```ts
 interface ProgressData {
+  name?:string;     // 文件名
   current: number;  // 已处理块数
   total: number;    // 总块数
   percent: string;  // 进度百分比
