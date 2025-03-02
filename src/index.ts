@@ -50,10 +50,11 @@ export interface HashResult {
  // @param chunkSize - 每个分块的大小（字节）
  // @returns 分块数组
 
-export const createChunks = (file: File, chunkSize: number): Blob[] => {
+ export const createChunks = (file: File, chunkSize: number): Blob[] => {
   const chunks: Blob[] = [];
   for (let i = 0; i < file.size; i += chunkSize) {
-    chunks.push(file.slice(i, i + chunkSize));
+    const end = Math.min(i + chunkSize, file.size);
+    chunks.push(file.slice(i, end));
   }
   return chunks;
 };
@@ -62,14 +63,13 @@ export const createChunks = (file: File, chunkSize: number): Blob[] => {
  // @param onProgress - 进度回调
  // @returns Promise解析为最终哈希值
 
-export const singleThreadHash = async (
+ export const singleThreadHash = async (
   chunks: Blob[],
   onProgress?: (data: ProgressData) => void
 ): Promise<string> => {
   const spark = new SparkMD5.ArrayBuffer();
   
   for (let i = 0; i < chunks.length; i++) {
-    // 读取分块内容
     const buffer = await new Promise<ArrayBuffer>((resolve) => {
       const reader = new FileReader();
       reader.onload = (e) => resolve(e.target?.result as ArrayBuffer);
@@ -78,7 +78,6 @@ export const singleThreadHash = async (
 
     spark.append(buffer);
     
-    // 更新进度
     onProgress?.({
       current: i + 1,
       total: chunks.length,
@@ -100,78 +99,94 @@ export const multiThreadHash = (
   return new Promise((resolve, reject) => {
     const workerCount = Math.min(navigator.hardwareConcurrency || 4, chunks.length);
     const workers: Worker[] = [];
-    const results: ArrayBuffer[] = new Array(chunks.length);
     let currentIndex = 0;
     let processedChunks = 0;
     const spark = new SparkMD5.ArrayBuffer();
 
     // 创建Worker
-    const createWorker = () => {
+    const createWorker = (): Worker => {
       const workerCode = `
-        self.onmessage = async ({ data: { index, url } }) => {
+        self.onmessage = async ({ data: { index, chunk } }) => {
           try {
-            const response = await fetch(url);
-            const buffer = await response.arrayBuffer();
+            const buffer = await chunk.arrayBuffer();
             self.postMessage({ index, buffer }, [buffer]);
           } catch (error) {
             self.postMessage({ 
               index, 
-              error: error instanceof Error ? error.message : String(error) 
+              error: error instanceof Error ? error.message : String(error)
             });
-          } finally {
-            URL.revokeObjectURL(url);
           }
         };
       `;
       return new Worker(URL.createObjectURL(new Blob([workerCode])));
     };
 
+    // 处理消息
     const handleMessage = (worker: Worker) => 
       (e: MessageEvent<{ index: number; buffer?: ArrayBuffer; error?: string }>) => {
         const { index, buffer, error } = e.data;
-        
+
+        // 错误
         if (error) {
-          reject(new Error(`分块 ${index} 处理失败: ${error}`));
-          worker.terminate();
+          workers.forEach(w => w.terminate());
+          reject(new Error(`Chunk ${index} error: ${error}`));
           return;
         }
 
-        if (buffer) {
-          results[index] = buffer;
-          processedChunks++;
-          
-          onProgress?.({
-            current: processedChunks,
-            total: chunks.length,
-            percent: ((processedChunks / chunks.length) * 100).toFixed(1)
-          });
+        if (!buffer) {
+          workers.forEach(w => w.terminate());
+          reject(new Error(`Empty chunk data at index ${index}`));
+          return;
+        }
 
-          spark.append(buffer);
-          
-          if (currentIndex < chunks.length) {
-            const chunk = chunks[currentIndex];
-            const url = URL.createObjectURL(chunk);
-            worker.postMessage({ index: currentIndex, url });
-            currentIndex++;
-          } else {
-            worker.terminate();
-          }
+        // 更新哈希计算
+        spark.append(buffer);
+        processedChunks++;
 
-          if (processedChunks === chunks.length) {
-            resolve(spark.end());
-          }
+        // 进度更新
+        onProgress?.({
+          current: processedChunks,
+          total: chunks.length,
+          percent: ((processedChunks / chunks.length) * 100).toFixed(1)
+        });
+
+        // 分配任务
+        if (currentIndex < chunks.length) {
+          const chunk = chunks[currentIndex];
+          worker.postMessage(
+            { index: currentIndex, chunk },
+            [chunk]
+          );
+          currentIndex++;
+        } else {
+          worker.terminate();
+        }
+
+        // 完成
+        if (processedChunks === chunks.length) {
+          workers.forEach(w => w.terminate());
+          resolve(spark.end());
         }
       };
 
+    // 初始化Worker
     for (let i = 0; i < workerCount; i++) {
       const worker = createWorker();
       worker.onmessage = handleMessage(worker);
+      worker.onerror = (e) => {
+        workers.forEach(w => w.terminate());
+        reject(new Error(`Worker error: ${e.message}`));
+      };
+
       if (currentIndex < chunks.length) {
         const chunk = chunks[currentIndex];
-        const url = URL.createObjectURL(chunk);
-        worker.postMessage({ index: currentIndex, url });
+        worker.postMessage(
+          { index: currentIndex, chunk },
+          [chunk]
+        );
         currentIndex++;
       }
+      workers.push(worker);
     }
   });
 };
