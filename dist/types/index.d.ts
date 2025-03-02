@@ -33,4 +33,5 @@ export declare const createChunks: (file: File, chunkSize: number) => Chunk[];
 export declare const singleThreadHash: (chunks: Chunk[], fileName: string, onProgress?: (data: ProgressData) => void) => Promise<string>;
 export declare const multiThreadHash: (chunks: Chunk[], fileName: string, onProgress?: (data: ProgressData) => void) => Promise<string>;
 export declare const calculateHash: (file: File, options?: HashOptions) => Promise<string>;
+export declare const calculateAllHashes: (files: File[], options?: AllHashOptions) => Promise<HashResult[]>;
 export {};
