@@ -124,9 +124,8 @@ export const multiThreadHash = (
       return new Worker(URL.createObjectURL(new Blob([workerCode])));
     };
 
-    // 处理消息
-    const handleMessage = (worker: Worker) => 
-      (e: MessageEvent<{ index: number; buffer?: ArrayBuffer; error?: string }>) => {
+    const createMessageHandler = (worker: Worker) => {
+      return (e: MessageEvent) => {
         const { index, buffer, error } = e.data;
 
         // 错误处理
@@ -146,7 +145,6 @@ export const multiThreadHash = (
         spark.append(buffer);
         processedChunks++;
 
-        // 更新进度
         onProgress?.({
           current: processedChunks,
           total: chunks.length,
@@ -169,14 +167,17 @@ export const multiThreadHash = (
           resolve(spark.end());
         }
       };
+    };
 
-    // 初始化Worker
+    // 初始化Worker池
     for (let i = 0; i < workerCount; i++) {
       const worker = createWorker();
-      worker.onmessage = handleMessage(worker);
+      
+      worker.onmessage = createMessageHandler(worker);
+      
       worker.onerror = (e) => {
         workers.forEach(w => w.terminate());
-        reject(new Error(`Worker 错误: ${e.message}`));
+        reject(new Error(`Worker错误: ${e.message}`));
       };
 
       if (currentIndex < chunks.length) {
