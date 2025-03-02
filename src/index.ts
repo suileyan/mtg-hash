@@ -106,15 +106,18 @@ export const multiThreadHash = (
     // 创建Worker
     const createWorker = (): Worker => {
       const workerCode = `
-        self.onmessage = async ({ data: { index, chunk } }) => {
+        self.onmessage = async ({ data: { index, url } }) => {
           try {
-            const buffer = await chunk.arrayBuffer();
+            const response = await fetch(url);
+            const buffer = await response.arrayBuffer();
             self.postMessage({ index, buffer }, [buffer]);
           } catch (error) {
             self.postMessage({ 
               index, 
               error: error instanceof Error ? error.message : String(error)
             });
+          } finally {
+            URL.revokeObjectURL(url);
           }
         };
       `;
@@ -126,16 +129,16 @@ export const multiThreadHash = (
       (e: MessageEvent<{ index: number; buffer?: ArrayBuffer; error?: string }>) => {
         const { index, buffer, error } = e.data;
 
-        // 错误
+        // 错误处理
         if (error) {
           workers.forEach(w => w.terminate());
-          reject(new Error(`Chunk ${index} error: ${error}`));
+          reject(new Error(`分块 ${index} 错误: ${error}`));
           return;
         }
 
         if (!buffer) {
           workers.forEach(w => w.terminate());
-          reject(new Error(`Empty chunk data at index ${index}`));
+          reject(new Error(`分块 ${index} 数据为空`));
           return;
         }
 
@@ -143,26 +146,24 @@ export const multiThreadHash = (
         spark.append(buffer);
         processedChunks++;
 
-        // 进度更新
+        // 更新进度
         onProgress?.({
           current: processedChunks,
           total: chunks.length,
           percent: ((processedChunks / chunks.length) * 100).toFixed(1)
         });
 
-        // 分配任务
+        // 分配新任务
         if (currentIndex < chunks.length) {
           const chunk = chunks[currentIndex];
-          worker.postMessage(
-            { index: currentIndex, chunk },
-            [chunk]
-          );
+          const url = URL.createObjectURL(chunk);
+          worker.postMessage({ index: currentIndex, url });
           currentIndex++;
         } else {
           worker.terminate();
         }
 
-        // 完成
+        // 完成处理
         if (processedChunks === chunks.length) {
           workers.forEach(w => w.terminate());
           resolve(spark.end());
@@ -175,15 +176,13 @@ export const multiThreadHash = (
       worker.onmessage = handleMessage(worker);
       worker.onerror = (e) => {
         workers.forEach(w => w.terminate());
-        reject(new Error(`Worker error: ${e.message}`));
+        reject(new Error(`Worker 错误: ${e.message}`));
       };
 
       if (currentIndex < chunks.length) {
         const chunk = chunks[currentIndex];
-        worker.postMessage(
-          { index: currentIndex, chunk },
-          [chunk]
-        );
+        const url = URL.createObjectURL(chunk);
+        worker.postMessage({ index: currentIndex, url });
         currentIndex++;
       }
       workers.push(worker);
