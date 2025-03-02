@@ -1,0 +1,21 @@
+{
+    "compilerOptions": {
+      "importHelpers": true,
+      "baseUrl": ".",
+      "target": "es2018",
+      "module": "esnext",
+      "lib": ["esnext", "dom"],
+      "declaration": true,
+      "declarationDir": "./dist/types",
+      "outDir": "./dist",
+      "strict": true,
+      "moduleResolution": "node",
+      "esModuleInterop": true,
+      "skipLibCheck": true,
+      "paths": {
+      "tslib": ["node_modules/tslib/tslib.d.ts"] 
+    }
+    },
+    "include": ["src/**/*"],
+    "exclude": ["node_modules"]
+  }

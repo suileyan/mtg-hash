@@ -1,0 +1,49 @@
+{
+  "name": "mtg-hash",
+  "version": "1.0.1",
+  "description": "Smart file hash calculator with web worker support",
+  "main": "dist/index.cjs.js",
+  "module": "dist/index.esm.js",
+  "types": "./dist/types/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "rollup --config rollup.config.mjs",
+    "prepublish": "npm run build"
+  },
+  "exports": {
+    ".": {
+      "import": "./dist/index.esm.js",
+      "require": "./dist/index.cjs.js",
+      "types": "./dist/types/index.d.ts"
+    }
+  },
+  "keywords": [
+    "hash",
+    "md5",
+    "web worker",
+    "file",
+    "performance"
+  ],
+  "author": "suileyan <3220145931@qq.com>",
+  "license": "MIT",
+  "dependencies": {
+    "spark-md5": "^3.0.2",
+    "p-limit": "^2.1.0"
+  },
+  "devDependencies": {
+    "@rollup/plugin-commonjs": "^25.0.8",
+    "@rollup/plugin-node-resolve": "^15.3.1",
+    "@rollup/plugin-terser": "^0.4.4",
+    "@rollup/plugin-typescript": "^11.1.6",
+    "@types/p-limit": "^2.1.0",
+    "@types/spark-md5": "^3.0.5",
+    "rollup": "^4.34.8",
+    "tslib": "^2.8.1",
+    "typescript": "^5.4.5"
+  },
+  "browser": {
+    "./dist/index.cjs.js": "./dist/index.browser.js"
+  }
+}
