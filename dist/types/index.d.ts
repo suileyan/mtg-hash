@@ -3,6 +3,9 @@ declare global {
         postMessage(message: any, transfer: Transferable[]): void;
     }
 }
+interface Chunk extends Blob {
+    fileId: string;
+}
 export interface ProgressData {
     name?: string;
     current: number;
@@ -26,8 +29,8 @@ export interface HashResult {
     hash: string | null;
     error?: Error;
 }
-export declare const createChunks: (file: File, chunkSize: number) => Blob[];
-export declare const singleThreadHash: (chunks: Blob[], onProgress?: (data: ProgressData) => void) => Promise<string>;
-export declare const multiThreadHash: (chunks: Blob[], onProgress?: (data: ProgressData) => void) => Promise<string>;
+export declare const createChunks: (file: File, chunkSize: number) => Chunk[];
+export declare const singleThreadHash: (chunks: Chunk[], fileName: string, onProgress?: (data: ProgressData) => void) => Promise<string>;
+export declare const multiThreadHash: (chunks: Chunk[], fileName: string, onProgress?: (data: ProgressData) => void) => Promise<string>;
 export declare const calculateHash: (file: File, options?: HashOptions) => Promise<string>;
-export declare const calculateAllHashes: (files: File[], options?: AllHashOptions) => Promise<HashResult[]>;
+export {};
