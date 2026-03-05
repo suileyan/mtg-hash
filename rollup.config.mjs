@@ -18,9 +18,14 @@ export default {
       format: 'cjs',
       exports: 'named',
       sourcemap: true
+    },
+    {
+      file: 'dist/index.browser.js',
+      format: 'iife',
+      name: 'MtgHash',
+      sourcemap: true
     }
   ],
-  external: ['spark-md5', 'p-limit'],
   plugins: [
     typescript({
       declaration: true,
