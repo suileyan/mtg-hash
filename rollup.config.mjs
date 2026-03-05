@@ -10,27 +10,31 @@ export default {
     {
       file: 'dist/index.esm.js',
       format: 'esm',
-      sourcemap: true
+      sourcemap: true,
+      exports: 'named'
     },
     {
       file: 'dist/index.cjs.js',
-      format: "cjs",
-      exports: "named",
+      format: 'cjs',
+      exports: 'named',
       sourcemap: true
     }
   ],
+  external: ['spark-md5', 'p-limit'],
   plugins: [
     typescript({
       declaration: true,
       declarationDir: 'dist/types',
-      compilerOptions: {
-        target: "esnext",
-        module: "esnext",
-        declaration: true,
-      }
+      rootDir: 'src',
+      exclude: ['**/*.test.ts', '**/*.spec.ts']
     }),
-    nodeResolve(),
-    commonjs(),
+    nodeResolve({
+      preferBuiltins: false,
+      browser: true
+    }),
+    commonjs({
+      transformMixedEsModules: true
+    }),
     terser({
       format: {
         comments: false,
@@ -38,8 +42,18 @@ export default {
       },
       compress: {
         drop_console: true,
-        passes: 3
+        drop_debugger: true,
+        passes: 2,
+        pure_funcs: ['console.log', 'console.info', 'console.debug']
+      },
+      mangle: {
+        safari10: true
       }
     })
-  ]
+  ],
+  treeshake: {
+    moduleSideEffects: false,
+    propertyReadSideEffects: false,
+    tryCatchDeoptimization: false
+  }
 };
